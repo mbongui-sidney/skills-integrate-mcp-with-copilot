@@ -3,6 +3,115 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const loginForm = document.getElementById("login-form");
+  const registerForm = document.getElementById("register-form");
+  const toggleAuthButton = document.getElementById("toggle-auth");
+  const logoutButton = document.getElementById("logout");
+  const authStatus = document.getElementById("auth-status");
+  let authToken = localStorage.getItem("authToken");
+
+  function authHeaders() {
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  }
+
+  function showMessage(text, className) {
+    messageDiv.textContent = text;
+    messageDiv.className = className;
+    messageDiv.classList.remove("hidden");
+  }
+
+  function updateAuthView(user) {
+    const loggedIn = Boolean(user);
+    loginForm.classList.toggle("hidden", loggedIn);
+    registerForm.classList.add("hidden");
+    toggleAuthButton.classList.toggle("hidden", loggedIn);
+    logoutButton.classList.toggle("hidden", !loggedIn);
+    authStatus.classList.toggle("hidden", !loggedIn);
+    authStatus.textContent = loggedIn
+      ? `Signed in as ${user.name} (${user.email})`
+      : "";
+    toggleAuthButton.textContent = "Create a profile";
+    signupForm.querySelector("button[type=submit]").disabled = !loggedIn;
+  }
+
+  async function loadProfile() {
+    if (!authToken) {
+      updateAuthView(null);
+      return;
+    }
+
+    const response = await fetch("/auth/me", { headers: authHeaders() });
+    if (!response.ok) {
+      localStorage.removeItem("authToken");
+      authToken = null;
+      updateAuthView(null);
+      return;
+    }
+    updateAuthView(await response.json());
+  }
+
+  async function authenticate(url, payload) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.detail || "Authentication failed");
+    }
+    return result;
+  }
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const result = await authenticate("/auth/login", {
+        email: document.getElementById("login-email").value,
+        password: document.getElementById("login-password").value,
+      });
+      authToken = result.access_token;
+      localStorage.setItem("authToken", authToken);
+      updateAuthView(result.user);
+      showMessage("Logged in successfully.", "success");
+      loginForm.reset();
+    } catch (error) {
+      showMessage(error.message, "error");
+    }
+  });
+
+  registerForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await authenticate("/auth/register", {
+        name: document.getElementById("register-name").value,
+        student_id: document.getElementById("register-student-id").value,
+        department: document.getElementById("register-department").value,
+        email: document.getElementById("register-email").value,
+        password: document.getElementById("register-password").value,
+      });
+      showMessage("Profile created. You can now log in.", "success");
+      registerForm.reset();
+      toggleAuthButton.click();
+    } catch (error) {
+      showMessage(error.message, "error");
+    }
+  });
+
+  toggleAuthButton.addEventListener("click", () => {
+    const showingRegistration = registerForm.classList.toggle("hidden");
+    loginForm.classList.toggle("hidden", !showingRegistration);
+    toggleAuthButton.textContent = showingRegistration
+      ? "Back to log in"
+      : "Create a profile";
+  });
+
+  logoutButton.addEventListener("click", () => {
+    localStorage.removeItem("authToken");
+    authToken = null;
+    updateAuthView(null);
+    showMessage("Logged out.", "success");
+  });
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -80,6 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/unregister?email=${encodeURIComponent(email)}`,
         {
           method: "DELETE",
+          headers: authHeaders(),
         }
       );
 
@@ -114,16 +224,14 @@ document.addEventListener("DOMContentLoaded", () => {
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const email = document.getElementById("email").value;
     const activity = document.getElementById("activity").value;
 
     try {
       const response = await fetch(
-        `/activities/${encodeURIComponent(
-          activity
-        )}/signup?email=${encodeURIComponent(email)}`,
+        `/activities/${encodeURIComponent(activity)}/signup`,
         {
           method: "POST",
+          headers: authHeaders(),
         }
       );
 
@@ -156,5 +264,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Initialize app
+  loadProfile();
   fetchActivities();
 });

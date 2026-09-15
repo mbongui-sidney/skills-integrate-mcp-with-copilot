@@ -5,7 +5,9 @@ A super simple FastAPI application that allows students to view and sign up for 
 ## Features
 
 - View all available extracurricular activities
-- Sign up for activities
+- Create a student profile and log in
+- Sign up for activities as the authenticated student
+- Unregister from activities as the authenticated student
 
 ## Getting Started
 
@@ -30,7 +32,11 @@ A super simple FastAPI application that allows students to view and sign up for 
 | Method | Endpoint                                                          | Description                                                         |
 | ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------- |
 | GET    | `/activities`                                                     | Get all activities with their details and current participant count |
-| POST   | `/activities/{activity_name}/signup?email=student@mergington.edu` | Sign up for an activity                                             |
+| POST   | `/auth/register`                                                  | Create a student profile                                             |
+| POST   | `/auth/login`                                                     | Log in and receive a bearer token                                   |
+| GET    | `/auth/me`                                                        | Get the authenticated student's profile                             |
+| POST   | `/activities/{activity_name}/signup`                              | Sign up the authenticated student                                  |
+| DELETE | `/activities/{activity_name}/unregister`                         | Unregister the authenticated student                               |
 
 ## Data Model
 
@@ -45,6 +51,9 @@ The application uses a simple data model with meaningful identifiers:
 
 2. **Students** - Uses email as identifier:
    - Name
-   - Grade level
+   - Student ID
+   - Department
+   - Role
+   - PBKDF2 password hash (never the plaintext password)
 
-All data is stored in memory, which means data will be reset when the server restarts.
+All data is stored in memory, including profiles and sessions, which means it will be reset when the server restarts.
